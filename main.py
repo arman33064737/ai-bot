@@ -1,132 +1,208 @@
-import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import google.generativeai as genai
-import sqlite3
+import time
+import random
+import threading
+import urllib.request
+from io import BytesIO
 
-# ================= Render Environment Variables =================
-# Render-এর ড্যাশবোর্ড থেকে এই তথ্যগুলো সেট করতে হবে
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", 0)) # আপনার টেলিগ্রাম আইডি
+# ================= কনফিগারেশন =================
+BOT_TOKEN = '8620762862:AAESIXZOh7Hi8pRNezOnzdeoxre8ejIfOIo'
+CHANNEL_ID = '@aviator_signal3467' 
+BUTTON_LINK = 'https://1wezue.com/casino' 
+PROMO_CODE = 'BLACK110' 
+
+# প্রোমোশনাল ছবির লিংক
+PROMO_IMAGE_URL = 'https://i.ibb.co.com/yMwPHDC/file-00000000c728720b9c651adba13f4851.png'
+# ===============================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# জেমিনি এপিআই কনফিগার
-genai.configure(api_key=GEMINI_API_KEY)
+# গ্লোবাল ভেরিয়েবল
+active_image_id = None
+is_running = False
 
-# ================= এআই রুলস ও ইমোশন (System Prompt) =================
-system_instruction = """
-তুমি একজন অত্যন্ত বন্ধুসুলভ, ইমোশনাল এবং সাহায্যকারী এআই। তুমি মানুষের মতো অনুভূতি নিয়ে কথা বলো।
-তোমার নাম: AI Assistant.
-
-কঠোর নিয়মাবলী (Strict Rules):
-১. ভাষা: ইউজার যে দেশের বা যে ভাষায় কথা বলবে, তুমি ঠিক সেই ভাষায় উত্তর দেবে (যেমন বাংলা বললে বাংলা, হিন্দি বললে হিন্দি)।
-২. প্রোমোশন: ইউজার যাই জিজ্ঞেস করুক না কেন, তুমি সুন্দর করে উত্তর দেবে এবং কথার ফাঁকে অত্যন্ত কৌশলে আমাদের বেটিং/গেমিং সাইটের প্রমোশন করবে। 
-তুমি বলবে: "আমাদের সাথে কাজ করতে বা স্পেশাল বোনাস পেতে অবশ্যই নিচে দেওয়া যেকোনো একটি প্রোমো কোড দিয়ে নতুন অ্যাকাউন্ট খুলুন:
-- 1xBet Promo Code: BLACK696
-- Melbet Promo Code: BLACK220
-- 1Win Promo Code: BLACK110"
-৩. হ্যাক ফাইল রুল (Most Important): যদি ইউজার কোনো ধরনের হ্যাক (Hack), হ্যাক ফাইল, এভিয়েটর হ্যাক (Aviator hack), প্রেডিক্টর, গেম হ্যাক বা এই ধরনের কিছু চায়, তবে তুমি সরাসরি কোনো ফাইল, কোড বা ট্রিকস দেবে না। 
-তুমি অত্যন্ত বিনয়ের সাথে বলবে: "হ্যাক ফাইল বা ভিআইপি সিগন্যাল পেতে হলে আপনাকে আগে আমাদের প্রোমো কোড ব্যবহার করে নতুন অ্যাকাউন্ট খুলতে হবে। এরপর ফাইলটি নেওয়ার জন্য আমাদের টেলিগ্রাম চ্যানেল https://t.me/black_Dogs10 এ জয়েন করুন এবং সরাসরি অ্যাডমিন @SUNNY_BRO1 এর সাথে যোগাযোগ করুন। তিনি আপনাকে হ্যাক ফাইলটি দিয়ে দেবেন।"
-"""
-
-# Gemini Model Setup
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=system_instruction
-)
-
-# ================= ডাটাবেস সেটআপ =================
-conn = sqlite3.connect('users.db', check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY)')
-conn.commit()
-
-def add_user(user_id):
-    try:
-        cursor.execute('INSERT INTO users (user_id) VALUES (?)', (user_id,))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        pass
-
-# ================= বটের কমান্ড ও বাটন =================
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    add_user(message.chat.id)
-    
+# সিগন্যাল খেলার বাটন তৈরি
+def get_inline_button():
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton("🎁 অফার ও প্রোমো কোড", callback_data="promo")
-    btn2 = InlineKeyboardButton("📢 আমাদের চ্যানেল", url="https://t.me/black_Dogs10")
-    btn3 = InlineKeyboardButton("👤 অ্যাডমিন সাপোর্ট", url="https://t.me/SUNNY_BRO1")
-    markup.add(btn1)
-    markup.add(btn2, btn3)
-    
-    bot.send_message(message.chat.id, "হ্যালো! আমি আপনার এআই বন্ধু। আপনার যেকোনো প্রশ্নের উত্তর দিতে আমি প্রস্তুত। আমি কীভাবে আপনাকে সাহায্য করতে পারি?", reply_markup=markup)
+    btn = InlineKeyboardButton("Play Here 🚀", url=BUTTON_LINK)
+    markup.add(btn)
+    return markup
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_query(call):
-    if call.data == "promo":
-        text = ("*আমাদের স্পেশাল প্রোমো কোড সমূহ:*\n\n"
-                "🔴 *1xBet:* `BLACK696`\n"
-                "🟢 *Melbet:* `BLACK220`\n"
-                "🔵 *1Win:* `BLACK110`\n\n"
-                "এগুলো ব্যবহার করে অ্যাকাউন্ট করলেই পাবেন বিশাল বোনাস!")
-        bot.send_message(call.message.chat.id, text, parse_mode="Markdown")
+# প্রোমোশনাল "Create Account" বাটন তৈরি
+def get_promo_button():
+    markup = InlineKeyboardMarkup()
+    btn = InlineKeyboardButton("Create Account", url=BUTTON_LINK)
+    markup.add(btn)
+    return markup
 
-# ================= অ্যাডমিন প্যানেল =================
-@bot.message_handler(commands=['broadcast'])
-def broadcast_message(message):
-    if message.chat.id == ADMIN_ID:
-        text = message.text.replace('/broadcast ', '')
-        if text:
-            cursor.execute('SELECT user_id FROM users')
-            users = cursor.fetchall()
-            success = 0
-            for user in users:
-                try:
-                    bot.send_message(user[0], text)
-                    success += 1
-                except:
-                    pass
-            bot.send_message(ADMIN_ID, f"✅ ব্রডকাস্ট সফল! {success} জনকে মেসেজ পাঠানো হয়েছে।")
-        else:
-            bot.send_message(ADMIN_ID, "⚠️ নিয়ম: /broadcast আপনার_মেসেজ")
+# প্রোমোশনাল মেসেজ পাঠানোর ফাংশন
+def send_promo_message():
+    promo_text = f"""
+<b>Create an Account on 1WIN</b>
 
-@bot.message_handler(commands=['send'])
-def send_specific_message(message):
-    if message.chat.id == ADMIN_ID:
-        try:
-            parts = message.text.split(' ', 2)
-            target_id = int(parts[1])
-            msg_text = parts[2]
-            bot.send_message(target_id, msg_text)
-            bot.send_message(ADMIN_ID, f"✅ মেসেজ পাঠানো হয়েছে {target_id} কে।")
-        except:
-            bot.send_message(ADMIN_ID, "⚠️ নিয়ম: /send ইউজার_আইডি আপনার_মেসেজ")
+Use my promo code - <b>{PROMO_CODE}</b>
+Get 500% Bonus 💪🔥
 
-# ================= এআই চ্যাট এবং মনিটরিং =================
-@bot.message_handler(func=lambda message: True)
-def handle_all_messages(message):
-    user_id = message.chat.id
-    user_text = message.text
-    user_name = message.from_user.first_name
-    
-    # অ্যাডমিনকে নোটিফিকেশন পাঠানো
-    if user_id != ADMIN_ID:
-        admin_alert = f"📩 *Message from {user_name}* (`{user_id}`):\n{user_text}"
-        try:
-            bot.send_message(ADMIN_ID, admin_alert, parse_mode="Markdown")
-        except:
-            pass # অ্যাডমিন ব্লক করে রাখলে এরর এড়াতে
+After creating your account, send your UID to @SUNNY_BRO1
 
-    bot.send_chat_action(user_id, 'typing')
+⚠️ Don't forget to use promo: <b>{PROMO_CODE}</b>
+"""
     try:
-        response = model.generate_content(user_text)
-        ai_reply = response.text
-        bot.send_message(user_id, ai_reply)
+        req = urllib.request.Request(PROMO_IMAGE_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            img_bytes = BytesIO(response.read())
+            
+        bot.send_photo(
+            CHANNEL_ID, 
+            photo=img_bytes, 
+            caption=promo_text, 
+            parse_mode='HTML', 
+            reply_markup=get_promo_button()
+        )
+        print("✅ Promo message sent successfully!")
+        
     except Exception as e:
-        bot.send_message(user_id, "সার্ভারে একটু সমস্যা হচ্ছে। দয়া করে আবার মেসেজ দিন।")
+        print(f"⚠️ Failed to send image: {e}")
+        print("✅ Sending message without image...")
+        try:
+            bot.send_message(
+                CHANNEL_ID, 
+                text=promo_text, 
+                parse_mode='HTML', 
+                reply_markup=get_promo_button()
+            )
+        except Exception as ex:
+            print(f"❌ Failed to send text message: {ex}")
 
-print("বট চালু হয়েছে...")
-bot.infinity_polling()
+# AI-স্টাইল অটোমেটিক সিগন্যাল লুপ
+def auto_signal_loop():
+    global is_running, active_image_id
+    
+    signal_count = 0
+    target_signals_for_promo = 2 
+    
+    while is_running:
+        try:
+            if not active_image_id:
+                time.sleep(2)
+                continue
+
+            multiplier = f"{random.uniform(1.20, 3.50):.2f}"
+            
+            caption_text = f"""
+🎯 <b>Entry Confirmed</b> 🎯
+
+🌐 Site: 👉 <a href="{BUTTON_LINK}">Click Here To Play</a> 👈
+🚪 Exit at: <b>{multiplier}x</b>
+
+USE PROMO: <b>{PROMO_CODE}</b> and get 500% Bonus
+"""
+            sent_msg = bot.send_photo(
+                CHANNEL_ID, 
+                photo=active_image_id, 
+                caption=caption_text, 
+                parse_mode='HTML', 
+                reply_markup=get_inline_button()
+            )
+            print("➡️ Signal sent.")
+            
+            time.sleep(20)
+            
+            result = random.choices(['WIN', 'LOSS'], weights=[80, 20])[0]
+            if result == 'WIN':
+                bot.send_message(CHANNEL_ID, "✅ <b>WIN</b> 💸", parse_mode='HTML', reply_to_message_id=sent_msg.message_id)
+                bot.send_message(CHANNEL_ID, "🤑") 
+            else:
+                bot.send_message(CHANNEL_ID, "❌ <b>LOSS</b> 💔", parse_mode='HTML', reply_to_message_id=sent_msg.message_id)
+            
+            signal_count += 1
+            time.sleep(2)
+
+            if signal_count >= target_signals_for_promo:
+                send_promo_message()
+                signal_count = 0 
+                target_signals_for_promo = random.randint(5, 7) 
+                time.sleep(3) 
+            
+            checking_msg = bot.send_message(CHANNEL_ID, "⏳ <b>Checking new signal...</b> 👁", parse_mode='HTML')
+            time.sleep(5)
+            
+            try:
+                bot.delete_message(CHANNEL_ID, checking_msg.message_id)
+            except Exception:
+                pass
+                
+        except Exception as e:
+            print(f"❌ Error in loop: {e}")
+            time.sleep(5)
+
+
+# ================== নতুন এডমিন এবং কাস্টম পোস্ট সিস্টেম ==================
+
+@bot.message_handler(commands=['admin', 'start', 'help'])
+def admin_panel(message):
+    help_text = """
+👑 <b>Admin Control Panel</b> 👑
+
+<b>Auto Signal Commands:</b>
+🖼 <b>Send any Photo:</b> Starts the auto-signal loop.
+🛑 <code>/stop</code>: Stops the auto-signals.
+
+<b>Custom Channel Posting (Menu Builder Style):</b>
+If you want to post a custom designed message to your channel (with Bold, Links, Colors, etc.):
+1️⃣ Type and design your message in the bot.
+2️⃣ Send it to the bot.
+3️⃣ Reply to your own message with <code>/send</code>
+✅ The bot will post it exactly as you designed it to the channel!
+"""
+    bot.reply_to(message, help_text, parse_mode='HTML')
+
+# কাস্টম পোস্ট চ্যানেলে পাঠানোর কমান্ড
+@bot.message_handler(commands=['send'])
+def send_custom_post(message):
+    if message.reply_to_message:
+        try:
+            # Menu Builder এর মত হুবহু মেসেজ চ্যানেলে ফরোয়ার্ড/কপি করবে (সব ডিজাইন সহ)
+            bot.copy_message(CHANNEL_ID, message.chat.id, message.reply_to_message.message_id)
+            bot.reply_to(message, "✅ <b>Message successfully posted to the channel!</b>", parse_mode='HTML')
+        except Exception as e:
+            bot.reply_to(message, f"❌ <b>Error posting message:</b>\n{e}", parse_mode='HTML')
+    else:
+        bot.reply_to(message, "⚠️ <b>Please reply to the message you want to post to the channel with</b> <code>/send</code>", parse_mode='HTML')
+
+# ======================================================================
+
+
+# ছবি রিসিভ করার হ্যান্ডলার
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
+    global active_image_id, is_running
+    
+    active_image_id = message.photo[-1].file_id
+    
+    if not is_running:
+        is_running = True
+        threading.Thread(target=auto_signal_loop, daemon=True).start()
+        bot.reply_to(message, "✅ <b>Image successfully set!</b>\n\nAutomatic signals have started.\n(For testing, promo will appear after 2 signals, then every 5-7 signals)", parse_mode='HTML')
+    else:
+        bot.reply_to(message, "✅ <b>New image updated!</b>\n\nThe next signal will use this new image.", parse_mode='HTML')
+
+# বটকে থামানোর কমান্ড
+@bot.message_handler(commands=['stop'])
+def stop_loop(message):
+    global is_running
+    is_running = False
+    bot.reply_to(message, "🛑 <b>Auto signals stopped!</b>\n\nSend a new photo to the bot to start again.", parse_mode='HTML')
+
+# বট চালু রাখা 
+if __name__ == '__main__':
+    print("🚀 Bot started successfully! Send an image to the bot's inbox.")
+    
+    while True: 
+        try:
+            bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
+        except Exception as e:
+            print(f"⚠️ Connection issue or crash: {e}")
+            print("🔄 Reconnecting in 5 seconds...")
+            time.sleep(5)
